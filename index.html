@@ -15,6 +15,14 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
+            background-color: #f8fafc;
+        }
+        /* Memberikan jarak aman di bagian atas agar tidak tertutup status bar HP (jam/baterai) */
+        .iframe-container {
+            width: 100%;
+            height: 100%;
+            padding-top: 24px; 
+            background-color: #ffffff;
         }
         iframe {
             width: 100%;
@@ -26,11 +34,14 @@
 </head>
 <body>
 
-    <!-- Ganti URL di bawah dengan URL Deployment Google Apps Script Anda -->
-    <iframe 
-        src="https://script.google.com/macros/s/AKfycbxRuFR-cVhRMPjbyOocCjLgiglWg-sTB9DuiIwjZlw0k57T7MemmUuj1qTgDjx2sm_K/exec" 
-        allow="geolocation; microphone; camera">
-    </iframe>
+    <div class="iframe-container">
+        <!-- Ganti URL di bawah dengan URL Deployment Google Apps Script Anda -->
+        <iframe 
+            src="https://script.google.com/macros/s/AKfycbxRuFR-cVhRMPjbyOocCjLgiglWg-sTB9DuiIwjZlw0k57T7MemmUuj1qTgDjx2sm_K/exec" 
+            allow="geolocation; microphone; camera">
+        </iframe>
+    </div>
 
 </body>
 </html>
+
