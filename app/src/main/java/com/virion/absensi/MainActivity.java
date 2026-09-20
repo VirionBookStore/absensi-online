@@ -5,12 +5,15 @@ import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
 import android.webkit.*;
+import android.widget.Toast;
 
 public class MainActivity extends Activity {
     WebView w;
     ValueCallback<Uri[]> f;
     static final int C = 1001;
+    boolean doubleBackToExitPressedOnce = false;
 
     @Override
     protected void onCreate(Bundle b) {
@@ -24,6 +27,7 @@ public class MainActivity extends Activity {
         s.setDomStorageEnabled(true);
         s.setAllowFileAccess(true);
         s.setAllowContentAccess(true);
+        s.setDatabaseEnabled(true);
         
         w.setWebViewClient(new WebViewClient());
         w.setWebChromeClient(new WebChromeClient() {
@@ -53,7 +57,7 @@ public class MainActivity extends Activity {
             }, 10);
         }
 
-        // Menggunakan GitHub Pages agar file HTML dirender dengan benar
+        // Pastikan URL mengarah ke link GitHub Pages absensi Anda
         w.loadUrl("https://virionbookstore.github.io/absensi-online/");
     }
 
@@ -71,8 +75,20 @@ public class MainActivity extends Activity {
         if (w.canGoBack()) {
             w.goBack();
         } else {
-            super.onBackPressed();
+            if (doubleBackToExitPressedOnce) {
+                super.onBackPressed();
+                return;
+            }
+
+            this.doubleBackToExitPressedOnce = true;
+            Toast.makeText(this, "Tekan sekali lagi untuk keluar aplikasi", Toast.LENGTH_SHORT).show();
+
+            new Handler().postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    doubleBackToExitPressedOnce = false;
+                }
+            }, 2000); // Jeda waktu 2 detik
         }
     }
 }
-
