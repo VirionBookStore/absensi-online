@@ -29,6 +29,18 @@ public class MainActivity extends Activity {
         s.setAllowContentAccess(true);
         s.setDatabaseEnabled(true);
         
+        // PERBAIKAN: Mengizinkan Mixed Content jika ada
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        }
+
+        // PERBAIKAN UTAMA: Mengizinkan Third-Party Cookies untuk Google Apps Script di dalam iframe
+        CookieManager cookieManager = CookieManager.getInstance();
+        cookieManager.setAcceptCookie(true);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            cookieManager.setAcceptThirdPartyCookies(w, true);
+        }
+        
         w.setWebViewClient(new WebViewClient());
         w.setWebChromeClient(new WebChromeClient() {
             @Override
@@ -92,3 +104,4 @@ public class MainActivity extends Activity {
         }
     }
 }
+
