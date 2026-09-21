@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Menyesuaikan warna address bar browser agar selaras dengan aplikasi -->
+    <meta name="theme-color" content="#163f68"> 
     <title>Aplikasi Saya</title>
     <link rel="manifest" href="manifest.json">
     <style>
@@ -15,14 +17,16 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background-color: #f8fafc;
+            /* Ubah background dasar menjadi warna biru header */
+            background-color: #163f68; 
         }
         /* Memberikan jarak aman di bagian atas agar tidak tertutup status bar HP (jam/baterai) */
         .iframe-container {
             width: 100%;
             height: 100%;
             padding-top: 24px; 
-            background-color: #ffffff;
+            /* UBAH DARI #ffffff MENJADI BIRU agar menyatu dengan header */
+            background-color: #163f68; /* Jika birunya kurang pas, Anda bisa sesuaikan kode hex ini */
         }
         iframe {
             width: 100%;
