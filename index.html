@@ -90,7 +90,7 @@
     
     <header class="bg-brand-800 text-white rounded-b-[30px] shadow-lg pt-4 px-4 pb-4 z-30 flex-shrink-0">
       <div class="flex justify-between items-center px-2">
-        <div class="flex items-center space-x-3 cursor-pointer" onclick="openGantiLogoModal()" title="Klik untuk ubah logo">
+        <div class="flex items-center space-x-3 cursor-pointer" onclick="openGantiLogoModal()" title="Klik untuk ubah logo (Admin/Owner)">
           <img id="appLogoImg" src="https://ui-avatars.com/api/?name=G&background=10b981&color=fff&rounded=true" class="w-9 h-9 rounded-full border-2 border-white/20 shadow-sm object-cover bg-white" />
           <h1 class="font-extrabold text-[17px] tracking-wide">Gravion Absen</h1>
         </div>
@@ -311,9 +311,10 @@
   </div>
 
   <script>
-    // --- WRAPPER AGAR BERFUNGSI DI GAS MAUPUN DI GITHUB PAGES ---
-    // PASTIKAN URL DI BAWAH INI DIGANTI DENGAN URL WEB APP GAS ANDA YANG AKTIF!
-    const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz6gnrPXSLcYAWo_jGt_-F_vTsouoNkmoROGRFqvHMED7w7xWOno1zNFT2frBWtokOW/exec"; 
+    // --- WRAPPER API FETCH KE GAS ---
+    // Ganti URL di bawah ini dengan URL Web App Anda dari Google Apps Script
+    // Pastikan Web App dideploy dengan hak akses: "Execute as: Me" dan "Who has access: Anyone"
+    const GAS_WEB_APP_URL = "URL_WEB_APP_GAS_ANDA_DI_SINI";
 
     const google = {
       script: {
@@ -327,30 +328,21 @@
             return this;
           },
           callBackend: function(action, payload) {
-            // Jika berjalan langsung di dalam GAS, biarkan native yang bekerja
-            if (typeof window.google !== 'undefined' && window.google.script && window.google.script.run && window.google.script.run !== google.script.run) {
-              return; 
-            }
-            
-            // Jika berjalan di GitHub, gunakan fetch untuk menembak API GAS
             fetch(GAS_WEB_APP_URL, {
               method: "POST",
-              headers: { 
-                // Wajib menggunakan text/plain agar tidak memicu error CORS preflight
-                "Content-Type": "text/plain;charset=utf-8" 
-              },
+              headers: { "Content-Type": "text/plain;charset=utf-8" },
               body: JSON.stringify({ action: action, payload: payload })
             })
             .then(response => {
-              if (!response.ok) throw new Error("Gagal terhubung ke server GAS");
-              return response.json(); // Baca data JSON dari server
+              if (!response.ok) throw new Error("Network response was not ok");
+              return response.json();
             })
             .then(data => {
               if (this.successCallback) this.successCallback(data);
             })
-            .catch(err => {
-              console.error("Error Fetch Backend:", err);
-              if (this.failureCallback) this.failureCallback(err);
+            .catch(error => {
+              console.error("Error connecting to GAS:", error);
+              if (this.failureCallback) this.failureCallback(error);
             });
           },
 
@@ -377,13 +369,6 @@
     let currentMainAction = 'MASUK'; 
     let tempLogoValue = "";
     
-    const MOCK_CABANG = [{ id: 'CAB-001', nama: 'Toko Pusat', alamat: 'Jakarta', lat: -6.2088, lng: 106.8456, radius: 50 }];
-    const MOCK_USERS = [
-        { id: 'EMP-000', username: 'owner', nama: 'Pemilik', role: 'owner', cabangId: 'CAB-001' }, 
-        { id: 'EMP-001', username: 'admin', nama: 'Administrator', role: 'admin', cabangId: 'CAB-001' }, 
-        { id: 'EMP-002', username: 'karyawan', nama: 'Budi Pekerja', role: 'karyawan', cabangId: 'CAB-001' }
-    ];
-
     let map = null, userMarker = null, branchCircle = null, currentLat = null, currentLng = null, currentAccuracy = null, isFakeGpsDetected = false, currentDistance = 999999;
     let clockInterval;
 
@@ -402,7 +387,7 @@
         document.getElementById('appLogoImg').src = localLogo;
       }
       google.script.run.withSuccessHandler(url => {
-        if (url) {
+        if (url && typeof url === 'string') {
           localStorage.setItem('custom_app_logo', url);
           document.getElementById('appLogoImg').src = url;
         }
@@ -435,6 +420,9 @@
           localStorage.setItem('absensi_session', JSON.stringify(currentUser));
           onLoginSuccess(); 
         } else showAlert(res ? res.message : 'Login gagal.', 'danger');
+      }).withFailureHandler(err => {
+        btn.disabled = false; btn.innerHTML = 'Masuk Sekarang <i class="fa-solid fa-arrow-right ml-2"></i>';
+        showAlert('Koneksi ke server gagal. Pastikan URL Web App GAS benar.', 'danger');
       }).loginUser(u, p);
     }
 
@@ -564,17 +552,23 @@
     function initPortalGPS() { initLeafletMap(); loadCabangList(); refreshGPSLocation(); fetchTodayStatus(); }
 
     function loadCabangList() {
-      google.script.run.withSuccessHandler(data => { listCabang = data||MOCK_CABANG; popCabang(document.getElementById('selectCabangToko')); }).getCabangList();
+      google.script.run.withSuccessHandler(data => { 
+        listCabang = data || []; 
+        popCabang(document.getElementById('selectCabangToko')); 
+      }).getCabangList();
     }
 
     function popCabang(sel) {
-      sel.innerHTML = ''; listCabang.forEach(c => sel.innerHTML += `<option value="${c.id}">${c.nama}</option>`);
-      if(listCabang.length > 0) { 
-        const defaultCabangId = currentUser ? (currentUser.cabangId || listCabang[0].id) : listCabang[0].id;
-        const exists = listCabang.find(x => x.id === defaultCabangId);
-        sel.value = exists ? exists.id : listCabang[0].id; 
-        onCabangChanged(); 
+      sel.innerHTML = ''; 
+      if (listCabang.length === 0) {
+        sel.innerHTML = '<option value="">Tidak ada cabang</option>';
+        return;
       }
+      listCabang.forEach(c => sel.innerHTML += `<option value="${c.id}">${c.nama}</option>`);
+      const defaultCabangId = currentUser ? (currentUser.cabangId || listCabang[0].id) : listCabang[0].id;
+      const exists = listCabang.find(x => x.id === defaultCabangId);
+      sel.value = exists ? exists.id : listCabang[0].id; 
+      onCabangChanged(); 
     }
 
     function onCabangChanged() {
@@ -667,7 +661,7 @@
 
       const reqPayload = { role: currentUser.role, cabangId: currentUser.cabangId };
       google.script.run.withSuccessHandler(karyawans => {
-        listKaryawan = karyawans || MOCK_USERS;
+        listKaryawan = karyawans || [];
         google.script.run.withSuccessHandler(schedules => { jadwalDataStore = schedules || []; renderJadwalGrid(); }).getJadwalKerja();
       }).getKaryawanAll(reqPayload);
     }
@@ -799,7 +793,15 @@
 
     function loadAdminCabangList() {
       const c = document.getElementById('listCabangAdmin'); c.innerHTML = '<div class="text-center text-xs py-4 text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat...</div>';
-      google.script.run.withSuccessHandler(data => { listCabang = data; c.innerHTML = ''; data.forEach(i => c.innerHTML += `<div class="p-3 bg-white border border-slate-200 rounded-xl mb-2 flex justify-between items-center shadow-sm"><div><b class="text-slate-700 text-sm">${i.nama}</b><p class="text-[10px] text-slate-500"><i class="fa-solid fa-location-dot mr-1"></i>${i.alamat} &bull; Radius: ${i.radius}m</p></div><button onclick="editCabangForm('${i.id}')" class="text-[10px] bg-brand-50 text-brand-600 font-bold border border-brand-200 px-3 py-1.5 rounded-lg shadow-sm">Edit</button></div>`); }).getCabangList();
+      google.script.run.withSuccessHandler(data => { 
+        listCabang = data || []; 
+        c.innerHTML = ''; 
+        if (listCabang.length === 0) {
+            c.innerHTML = '<div class="text-center text-xs py-4 text-slate-400">Tidak ada data cabang.</div>';
+            return;
+        }
+        listCabang.forEach(i => c.innerHTML += `<div class="p-3 bg-white border border-slate-200 rounded-xl mb-2 flex justify-between items-center shadow-sm"><div><b class="text-slate-700 text-sm">${i.nama}</b><p class="text-[10px] text-slate-500"><i class="fa-solid fa-location-dot mr-1"></i>${i.alamat} &bull; Radius: ${i.radius}m</p></div><button onclick="editCabangForm('${i.id}')" class="text-[10px] bg-brand-50 text-brand-600 font-bold border border-brand-200 px-3 py-1.5 rounded-lg shadow-sm">Edit</button></div>`); 
+      }).getCabangList();
     }
     
     function editCabangForm(id) { const c = listCabang.find(x => x.id === id); if(c) { ['Id','Nama','Alamat','Lat','Lng','Radius'].forEach(k => document.getElementById('cabang'+k).value = c[k.toLowerCase()]); } }
@@ -814,6 +816,10 @@
       const reqPayload = { role: currentUser.role, cabangId: currentUser.cabangId };
       google.script.run.withSuccessHandler(users => { 
         listKaryawan = users||[]; c.innerHTML = ''; 
+        if (listKaryawan.length === 0) {
+            c.innerHTML = '<div class="text-center text-xs py-4 text-slate-400">Tidak ada data karyawan.</div>';
+            return;
+        }
         listKaryawan.forEach(u => c.innerHTML += `<div class="p-3 bg-white border border-slate-200 rounded-xl mb-2 flex justify-between items-center shadow-sm"><div><b class="text-slate-700 text-sm">${u.nama}</b> <span class="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ml-1">${u.role}</span><p class="text-[10px] text-slate-500 font-mono mt-0.5">${u.username}</p></div>${(userRoleLower==='admin'&&String(u.role).toLowerCase()==='owner')?'<span class="text-[10px] p-2 text-slate-300"><i class="fa-solid fa-lock"></i></span>':`<button onclick="editKaryawanForm('${u.id}')" class="text-[10px] bg-brand-50 text-brand-600 font-bold border border-brand-200 px-3 py-1.5 rounded-lg shadow-sm">Edit</button>`}</div>`); 
       }).getKaryawanAll(reqPayload);
     }
