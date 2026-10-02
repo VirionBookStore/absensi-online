@@ -1,50 +1,904 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Menyesuaikan warna address bar browser agar selaras dengan aplikasi -->
-    <meta name="theme-color" content="#163f68"> 
-    <title>Aplikasi Saya</title>
-    <link rel="manifest" href="manifest.json">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        html, body {
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            /* Ubah background dasar menjadi warna biru header */
-            background-color: #163f68; 
-        }
-        /* Memberikan jarak aman di bagian atas agar tidak tertutup status bar HP (jam/baterai) */
-        .iframe-container {
-            width: 100%;
-            height: 100%;
-            padding-top: 24px; 
-            /* UBAH DARI #ffffff MENJADI BIRU agar menyatu dengan header */
-            background-color: #163f68; /* Jika birunya kurang pas, Anda bisa sesuaikan kode hex ini */
-        }
-        iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-            display: block;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Gravion Absensi Online</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { 
+        extend: { 
+          colors: { 
+            brand: { 
+              50: '#f0f6fc', 
+              200: '#b6d4f0', 
+              500: '#2374b6', 
+              600: '#1d639e', 
+              700: '#195282', 
+              800: '#154670', 
+              900: '#0f3354' 
+            } 
+          } 
+        } 
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; color: #334155; height: 100vh; overflow: hidden; }
+    #map { height: 220px; width: 100%; border-radius: 1rem; z-index: 1; }
+    .touch-btn { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    
+    .clock-circle {
+      width: 200px; height: 200px;
+      border-radius: 50%;
+      border: 6px solid #154670;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      margin: 0 auto;
+      background: white;
+      box-shadow: 0 10px 25px -5px rgba(21, 70, 112, 0.15);
+      position: relative;
+    }
+    .clock-tick {
+      position: absolute; width: 4px; height: 12px; background-color: #154670; border-radius: 2px;
+    }
+    .tick-12 { top: 10px; left: 50%; transform: translateX(-50%); }
+    .tick-3 { right: 10px; top: 50%; transform: translateY(-50%) rotate(90deg); }
+    .tick-6 { bottom: 10px; left: 50%; transform: translateX(-50%); }
+    .tick-9 { left: 10px; top: 50%; transform: translateY(-50%) rotate(90deg); }
+  </style>
 </head>
-<body>
+<body class="antialiased flex flex-col max-w-md mx-auto bg-slate-50 relative shadow-2xl h-screen overflow-hidden">
 
-    <div class="iframe-container">
-        <!-- Ganti URL di bawah dengan URL Deployment Google Apps Script Anda -->
-        <iframe 
-            src="https://script.google.com/macros/s/AKfycbxKKXsKaKjFDjk3DSgZ2RE9Wt2-yYks32Bo2CoCm1kq4jtZ2qWTxy8uJMFhNaH9qSSM/exec" 
-            allow="geolocation; microphone; camera">
-        </iframe>
+  <div id="alertBox" class="hidden fixed top-4 left-4 right-4 z-[999] p-4 rounded-2xl border flex items-start space-x-3 text-sm shadow-xl transition-all">
+    <i id="alertIcon" class="fa-solid mt-0.5 text-lg"></i>
+    <div id="alertText" class="flex-1 font-semibold leading-snug"></div>
+  </div>
+
+  <!-- Login Section -->
+  <div id="loginSection" class="absolute inset-0 z-50 flex items-center justify-center p-6 bg-white overflow-y-auto">
+    <div class="w-full max-w-sm space-y-8">
+      <div class="text-center">
+        <div class="w-20 h-20 bg-brand-50 border border-brand-200 text-brand-800 rounded-3xl flex items-center justify-center text-4xl mx-auto mb-4 shadow-sm"><i class="fa-solid fa-clock"></i></div>
+        <h2 class="text-2xl font-extrabold text-slate-800">Gravion Absen</h2>
+        <p class="text-sm text-slate-500 mt-1">Silakan masuk ke akun Anda</p>
+      </div>
+      <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-5">
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wide">Username</label>
+          <div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400"><i class="fa-solid fa-user"></i></span><input type="text" id="loginUsername" required class="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition" placeholder="Masukkan username"></div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wide">Password</label>
+          <div class="relative"><span class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400"><i class="fa-solid fa-key"></i></span><input type="password" id="loginPassword" required class="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition" placeholder="••••••••"></div>
+        </div>
+        <button type="submit" id="btnLogin" class="touch-btn w-full bg-brand-800 hover:bg-brand-900 text-white font-bold py-4 rounded-xl text-sm shadow-lg transition flex items-center justify-center">Masuk Sekarang <i class="fa-solid fa-arrow-right ml-2"></i></button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main Dashboard Section -->
+  <div id="mainDashboardSection" class="hidden flex-1 flex flex-col h-full overflow-hidden">
+    
+    <header class="bg-brand-800 text-white rounded-b-[30px] shadow-lg pt-4 px-4 pb-4 z-30 flex-shrink-0">
+      <div class="flex justify-between items-center px-2">
+        <div class="flex items-center space-x-3 cursor-pointer" onclick="openGantiLogoModal()" title="Klik untuk ubah logo">
+          <img id="appLogoImg" src="https://ui-avatars.com/api/?name=G&background=10b981&color=fff&rounded=true" class="w-9 h-9 rounded-full border-2 border-white/20 shadow-sm object-cover bg-white" />
+          <h1 class="font-extrabold text-[17px] tracking-wide">Gravion Absen</h1>
+        </div>
+        
+        <div class="flex items-center space-x-3">
+          <div class="text-right">
+            <div id="userNameBadge" class="text-xs font-bold leading-tight text-white">Name</div>
+            <div id="userRoleBadge" class="text-[10px] text-brand-200 capitalize leading-tight">Role</div>
+          </div>
+          <div id="userProfileInitials" class="w-9 h-9 bg-white text-brand-800 rounded-full flex items-center justify-center font-extrabold text-sm shadow-sm border-2 border-brand-500/50">U</div>
+          <button onclick="logout()" class="text-white/80 hover:text-white transition p-1.5" title="Keluar Akun"><i class="fa-solid fa-right-from-bracket text-base"></i></button>
+        </div>
+      </div>
+    </header>
+
+    <div class="flex-1 overflow-y-auto p-4 space-y-4 pb-24">
+      
+      <!-- Tab Absen -->
+      <div id="contentTabAbsen" class="space-y-5 pb-6">
+        <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-100">
+          <label class="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase px-1">Pilih Cabang / Lokasi:</label>
+          <select id="selectCabangToko" onchange="onCabangChanged()" class="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"></select>
+        </div>
+
+        <div class="py-2">
+          <div class="clock-circle">
+            <div class="clock-tick tick-12"></div><div class="clock-tick tick-3"></div><div class="clock-tick tick-6"></div><div class="clock-tick tick-9"></div>
+            <div class="text-[10px] font-bold text-slate-400 mb-1">WIB</div>
+            <div id="clockTime" class="text-3xl font-extrabold text-slate-800 tracking-tight">00:00:00</div>
+            <div id="clockDate" class="text-xs font-semibold text-slate-500 mt-1">Memuat...</div>
+          </div>
+        </div>
+
+        <div class="text-center space-y-2">
+          <div class="flex items-center justify-center space-x-1.5 text-slate-600">
+            <i class="fa-solid fa-location-dot text-brand-500"></i>
+            <span id="txtDistanceInfo" class="text-sm font-bold">Mencari Lokasi...</span>
+          </div>
+          <div id="statusSelesaiLabel" class="hidden inline-flex items-center space-x-1.5 bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-bold border border-slate-200">
+            <i class="fa-solid fa-check-double text-emerald-500"></i> <span>Selesai Hari Ini</span>
+          </div>
+          
+          <div id="warningBadgeGPS" class="hidden mx-auto max-w-[250px] bg-rose-50 text-rose-600 px-3 py-2 rounded-xl text-[11px] font-bold border border-rose-200 flex items-start space-x-2 text-left mt-2">
+            <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>
+            <span id="warningTextGPS">Jarak terlalu jauh atau Fake GPS terdeteksi.</span>
+          </div>
+        </div>
+
+        <div class="px-2 pt-1">
+          <button id="btnMainAbsen" onclick="handleMainAbsenAction()" class="touch-btn w-full bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold py-4 rounded-2xl shadow-lg shadow-emerald-500/30 transition-all text-sm flex items-center justify-center space-x-2">
+            <i class="fa-solid fa-fingerprint text-xl"></i>
+            <span id="btnMainAbsenText" class="tracking-wide text-base">CHECK-IN</span>
+          </button>
+        </div>
+
+        <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-100">
+           <div class="flex items-center justify-between mb-2 px-1">
+             <span class="text-xs font-bold text-slate-700">Peta Lokasi</span>
+             <button onclick="refreshGPSLocation()" class="touch-btn text-[10px] font-bold text-brand-500 bg-brand-50 px-2 py-1 rounded border border-brand-200"><i class="fa-solid fa-rotate mr-1"></i>Refresh GPS</button>
+           </div>
+           <div id="map"></div>
+        </div>
+      </div>
+
+      <!-- Tab Jadwal -->
+      <div id="contentTabJadwal" class="hidden bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <h3 class="font-extrabold text-sm text-slate-800">Jadwal Kerja</h3>
+          <div class="flex items-center space-x-1.5">
+            <button onclick="changeScheduleWeek(-7)" class="touch-btn bg-slate-100 text-slate-600 px-2.5 py-1 rounded border border-slate-200 text-[10px] font-bold hover:bg-slate-200"><i class="fa-solid fa-chevron-left mr-1"></i>Minggu Lalu</button>
+            <button onclick="changeScheduleWeek(7)" class="touch-btn bg-slate-100 text-slate-600 px-2.5 py-1 rounded border border-slate-200 text-[10px] font-bold hover:bg-slate-200">Minggu Depan<i class="fa-solid fa-chevron-right ml-1"></i></button>
+            <button id="btnSaveSchedule" onclick="saveJadwalChanges()" class="hidden touch-btn bg-brand-600 hover:bg-brand-700 text-white px-3 py-1 rounded-lg text-[10px] font-bold shadow ml-1"><i class="fa-solid fa-floppy-disk mr-1"></i>Simpan</button>
+          </div>
+        </div>
+        <div class="overflow-x-auto rounded-xl border border-slate-200 shadow-inner no-scrollbar">
+          <table class="w-full text-left text-xs text-slate-600 border-collapse min-w-max" id="tableJadwalGrid"></table>
+        </div>
+      </div>
+
+      <!-- Tab Log Absen -->
+      <div id="contentTabLogabsen" class="hidden bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div class="flex items-center space-x-2">
+            <h3 class="font-extrabold text-sm text-slate-800">Log Kehadiran</h3>
+            <span id="badgeTotalHadirKaryawan" class="hidden bg-emerald-50 text-emerald-600 text-[10px] font-extrabold px-2.5 py-1 rounded-full border border-emerald-200"></span>
+          </div>
+          <div class="flex items-center space-x-1.5">
+            <select id="filterLogKaryawan" onchange="applyLogFilter()" class="hidden text-[10px] bg-slate-50 border border-slate-200 px-2 py-1.5 rounded-lg font-bold text-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-500">
+                <option value="ALL">Semua Karyawan</option>
+            </select>
+            <button onclick="loadAdminLogs()" class="touch-btn text-[10px] text-brand-500 font-bold bg-brand-50 border border-brand-200 px-3 py-1.5 rounded-lg"><i class="fa-solid fa-rotate mr-1"></i>Muat Log</button>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-600 border-collapse">
+            <thead><tr class="bg-slate-50 text-[10px] text-slate-500 border-b border-slate-200"><th class="p-2 font-bold">Waktu</th><th class="p-2 font-bold">Nama</th><th class="p-2 font-bold">Tipe</th><th class="p-2 font-bold">Sales</th><th class="p-2 font-bold">Status</th></tr></thead>
+            <tbody id="tblAdminLogsBody"><tr><td colspan="5" class="p-4 text-center text-slate-400">Klik Muat Log.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab Cabang -->
+      <div id="contentTabCabang" class="hidden space-y-4 pb-6">
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <h3 class="font-extrabold text-sm text-slate-800 pb-2 border-b border-slate-100">Kelola Cabang</h3>
+          <form id="formCabang" onsubmit="handleSaveCabang(event)" class="space-y-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <input type="hidden" id="cabangId">
+            <div class="grid grid-cols-2 gap-2">
+              <input type="text" id="cabangNama" required placeholder="Nama Toko" class="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-brand-500 outline-none">
+              <input type="text" id="cabangAlamat" required placeholder="Alamat Singkat" class="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-brand-500 outline-none">
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              <input type="number" step="any" id="cabangLat" required placeholder="Latitude" class="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-brand-500 outline-none">
+              <input type="number" step="any" id="cabangLng" required placeholder="Longitude" class="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-brand-500 outline-none">
+              <input type="number" id="cabangRadius" required placeholder="Radius(m)" class="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-brand-500 outline-none">
+            </div>
+            <div class="flex space-x-2 pt-1">
+              <button type="submit" class="touch-btn flex-1 bg-brand-600 text-white font-bold py-2 rounded-lg text-[11px] shadow">Simpan Data</button>
+              <button type="button" onclick="document.getElementById('formCabang').reset(); document.getElementById('cabangId').value='';" class="touch-btn bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-[11px] font-bold">Batal</button>
+            </div>
+          </form>
+          <div id="listCabangAdmin" class="space-y-2 text-xs"></div>
+        </div>
+      </div>
+
+      <!-- Tab User -->
+      <div id="contentTabUser" class="hidden space-y-4 pb-6">
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <h3 class="font-extrabold text-sm text-slate-800 pb-2 border-b border-slate-100">Kelola Karyawan</h3>
+          <form id="formKaryawan" onsubmit="handleSaveKaryawan(event)" class="space-y-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <input type="hidden" id="empId">
+            <div class="grid grid-cols-2 gap-2">
+              <input type="text" id="empUsername" required placeholder="Username" class="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-brand-500 outline-none">
+              <input type="text" id="empPassword" required placeholder="Password" class="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-brand-500 outline-none">
+            </div>
+            <input type="text" id="empNama" required placeholder="Nama Lengkap" class="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-brand-500 outline-none">
+            <div class="grid grid-cols-2 gap-2">
+              <input type="text" id="empJabatan" required placeholder="Jabatan / Posisi" class="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-brand-500 outline-none">
+              <select id="empRole" class="w-full p-2 bg-white border border-slate-300 rounded-lg text-[11px] font-semibold focus:ring-2 focus:ring-brand-500 outline-none">
+                <option value="karyawan">Karyawan</option>
+                <option value="admin">Admin</option>
+                <option value="owner" id="optRoleOwner">Owner</option>
+              </select>
+            </div>
+            <div class="flex space-x-2 pt-1">
+              <button type="submit" class="touch-btn flex-1 bg-brand-600 text-white font-bold py-2 rounded-lg text-[11px] shadow">Simpan User</button>
+              <button type="button" onclick="document.getElementById('formKaryawan').reset(); document.getElementById('empId').value='';" class="touch-btn bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-[11px] font-bold">Batal</button>
+            </div>
+          </form>
+          <div id="listKaryawanAdmin" class="space-y-2 text-xs"></div>
+        </div>
+      </div>
+
     </div>
 
+    <!-- BOTTOM NAVIGATION LOCKED -->
+    <nav class="bg-white border-t border-slate-200 pb-safe z-30 absolute bottom-0 w-full max-w-md mx-auto shadow-[0_-4px_15px_-5px_rgba(0,0,0,0.05)]">
+      <div id="bottomNavContainer" class="flex justify-around p-2">
+        <button id="btmNavAbsen" onclick="switchMainTab('absen')" class="touch-btn flex flex-col items-center p-2 text-brand-800 transition"><i class="fa-solid fa-clock text-xl mb-1"></i><span class="text-[9px] font-bold">Absen</span></button>
+        <button id="btmNavJadwal" onclick="switchMainTab('jadwal')" class="touch-btn flex flex-col items-center p-2 text-slate-400 hover:text-brand-600 transition"><i class="fa-solid fa-calendar-days text-xl mb-1"></i><span class="text-[9px] font-bold">Jadwal</span></button>
+        <button id="btmNavLogabsen" onclick="switchMainTab('logabsen')" class="touch-btn flex flex-col items-center p-2 text-slate-400 hover:text-brand-600 transition"><i class="fa-solid fa-list-check text-xl mb-1"></i><span class="text-[9px] font-bold">Log Absen</span></button>
+        <button id="btmNavCabang" onclick="switchMainTab('cabang')" class="touch-btn flex flex-col items-center p-2 text-slate-400 hover:text-brand-600 transition"><i class="fa-solid fa-store text-xl mb-1"></i><span class="text-[9px] font-bold">Cabang</span></button>
+        <button id="btmNavUser" onclick="switchMainTab('user')" class="touch-btn flex flex-col items-center p-2 text-slate-400 hover:text-brand-600 transition"><i class="fa-solid fa-users-gear text-xl mb-1"></i><span class="text-[9px] font-bold">User</span></button>
+      </div>
+    </nav>
+  </div>
+
+  <!-- Modal Ganti Logo Aplikasi -->
+  <div id="modalGantiLogo" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity">
+    <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4 border border-slate-100">
+      <div class="text-center space-y-1">
+        <div class="w-12 h-12 bg-brand-50 text-brand-600 rounded-full flex items-center justify-center text-xl mx-auto"><i class="fa-solid fa-icons"></i></div>
+        <h3 class="font-extrabold text-lg text-slate-800">Ganti Logo Aplikasi</h3>
+        <p class="text-xs text-slate-500">Pilih file gambar atau paste link Google Drive.</p>
+      </div>
+      
+      <div class="space-y-3 pt-2">
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">Upload Gambar dari Perangkat</label>
+          <input type="file" id="inputLogoFile" accept="image/*" onchange="handleLogoFileSelect(event)" class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 cursor-pointer">
+        </div>
+        
+        <div class="text-center text-[11px] text-slate-400 font-bold">- ATAU PASTE LINK GOOGLE DRIVE -</div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">Link Google Drive</label>
+          <input type="text" id="inputLogoUrl" oninput="handleLogoUrlInput(this.value)" placeholder="https://drive.google.com/file/d/.../view" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+
+        <div class="w-20 h-20 mx-auto bg-slate-100 rounded-2xl border border-slate-200 flex items-center justify-center overflow-hidden">
+          <img id="previewLogoImg" src="" alt="Preview" class="w-full h-full object-cover hidden">
+          <i id="previewLogoIcon" class="fa-solid fa-image text-2xl text-slate-300"></i>
+        </div>
+      </div>
+
+      <div class="flex space-x-3 pt-2">
+        <button onclick="document.getElementById('modalGantiLogo').classList.add('hidden')" class="touch-btn flex-1 bg-slate-100 text-slate-600 font-bold py-3 rounded-xl text-xs border border-slate-200 hover:bg-slate-200">Batal</button>
+        <button onclick="simpanLogoBaru()" class="touch-btn flex-1 bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-xl text-xs shadow-lg shadow-brand-500/30">Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Sales Cash -->
+  <div id="modalSalesCash" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity">
+    <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-5 border border-slate-100">
+      <div class="text-center space-y-1">
+        <div class="w-12 h-12 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center text-2xl mx-auto"><i class="fa-solid fa-cash-register"></i></div>
+        <h3 class="font-extrabold text-lg text-slate-800">Pendapatan Hari Ini</h3>
+        <p class="text-xs text-slate-500">Masukkan total sales cash sebelum pulang.</p>
+      </div>
+      <input type="number" min="0" id="inputSalesCash" placeholder="Nominal (Rp)" class="w-full py-4 px-4 bg-slate-50 border border-slate-200 rounded-2xl text-lg font-extrabold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500 text-center">
+      <div id="modalSalesCashError" class="hidden text-xs text-rose-500 bg-rose-50 p-2.5 rounded-xl border border-rose-200 text-center font-bold">Isi nominal dengan benar!</div>
+      <div class="flex space-x-3 pt-2">
+        <button onclick="document.getElementById('modalSalesCash').classList.add('hidden')" class="touch-btn flex-1 bg-slate-100 text-slate-600 font-bold py-3.5 rounded-xl text-sm border border-slate-200 hover:bg-slate-200">Batal</button>
+        <button onclick="konfirmasiAbsenPulangWithSales()" class="touch-btn flex-1 bg-amber-500 hover:bg-amber-600 text-white font-extrabold py-3.5 rounded-xl text-sm shadow-lg shadow-amber-500/30">Check-Out</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- WRAPPER AGAR BERFUNGSI DI GAS MAUPUN DI GITHUB PAGES ---
+    const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz6gnrPXSLcYAWo_jGt_-F_vTsouoNkmoROGRFqvHMED7w7xWOno1zNFT2frBWtokOW/exec"; // <-- GANTI DENGAN URL WEB APP GAS ANDA
+
+    const google = {
+      script: {
+        run: {
+          withSuccessHandler: function(successCallback) {
+            this.successCallback = successCallback;
+            return this;
+          },
+          withFailureHandler: function(failureCallback) {
+            this.failureCallback = failureCallback;
+            return this;
+          },
+          // Jembatan otomatis panggil backend GAS jika di GitHub Pages, atau pakai native jika di GAS
+          callBackend: function(action, payload) {
+            if (typeof window.google !== 'undefined' && window.google.script && window.google.script.run && window.google.script.run !== google.script.run) {
+              // Berjalan di dalam lingkungan asli Google Apps Script
+              return; 
+            }
+            
+            // Berjalan di GitHub Pages (menggunakan fetch ke Web App GAS)
+            fetch(GAS_WEB_APP_URL, {
+              method: "POST",
+              mode: "no-cors", // Diperlukan untuk bypass CORS sederhana pada GAS Web App
+              headers: { "Content-Type": "text/plain;charset=utf-8" },
+              body: JSON.stringify({ action: action, payload: payload })
+            })
+            .then(() => {
+              // Karena mode 'no-cors' tidak bisa membaca response JSON langsung secara aman, 
+              // kita handle callback sukses secara umum atau gunakan metode get terpisah jika perlu.
+              if (this.successCallback) this.successCallback({ success: true });
+            })
+            .catch(err => {
+              if (this.failureCallback) this.failureCallback(err);
+            });
+          },
+
+          loginUser: function(u, p) { this.callBackend('loginUser', {username: u, password: p}); },
+          getTodayStatus: function(userId) { this.callBackend('getTodayStatus', userId); },
+          getCabangList: function() { this.callBackend('getCabangList', {}); },
+          submitAbsensi: function(payload) { this.callBackend('submitAbsensi', payload); },
+          getJadwalKerja: function() { this.callBackend('getJadwalKerja', {}); },
+          saveJadwalKerja: function(jadwalData) { this.callBackend('saveJadwalKerja', {jadwalData: jadwalData}); },
+          getDashboardStats: function(req) { this.callBackend('getDashboardStats', {req: req}); },
+          getAbsensiHistory: function(req) { this.callBackend('getAbsensiHistory', {req: req}); },
+          saveCabang: function(cabangData) { this.callBackend('saveCabang', {cabangData: cabangData}); },
+          getKaryawanAll: function(req) { this.callBackend('getKaryawanAll', {req: req}); },
+          saveKaryawan: function(karyawanData, userRole) { this.callBackend('saveKaryawan', {karyawanData: karyawanData, userRole: userRole}); },
+          getAppSettings: function() { this.callBackend('getAppSettings', {}); },
+          saveAppSettings: function(logoUrl) { this.callBackend('saveAppSettings', {logoUrl: logoUrl}); }
+        }
+      }
+    };
+    // -------------------------------------------------------------
+
+    let currentUser = null, listCabang = [], selectedCabang = null, listKaryawan = [], jadwalDataStore = [], scheduleOffsetDays = 0, allLogsData = [];
+    let todayAbsenStatus = { masuk: null, pulang: null }; 
+    let currentMainAction = 'MASUK'; 
+    let tempLogoValue = "";
+    
+    const MOCK_CABANG = [{ id: 'CAB-001', nama: 'Toko Pusat', alamat: 'Jakarta', lat: -6.2088, lng: 106.8456, radius: 50 }];
+    const MOCK_USERS = [
+        { id: 'EMP-000', username: 'owner', nama: 'Pemilik', role: 'owner', cabangId: 'CAB-001' }, 
+        { id: 'EMP-001', username: 'admin', nama: 'Administrator', role: 'admin', cabangId: 'CAB-001' }, 
+        { id: 'EMP-002', username: 'karyawan', nama: 'Budi Pekerja', role: 'karyawan', cabangId: 'CAB-001' }
+    ];
+
+    let map = null, userMarker = null, branchCircle = null, currentLat = null, currentLng = null, currentAccuracy = null, isFakeGpsDetected = false, currentDistance = 999999;
+    let clockInterval;
+
+    window.onload = function() { 
+      loadGlobalAppLogo();
+      const savedSession = localStorage.getItem('absensi_session');
+      if (savedSession) {
+        currentUser = JSON.parse(savedSession);
+        onLoginSuccess();
+      }
+    };
+
+    function loadGlobalAppLogo() {
+      const localLogo = localStorage.getItem('custom_app_logo');
+      if (localLogo) {
+        document.getElementById('appLogoImg').src = localLogo;
+      }
+      google.script.run.withSuccessHandler(url => {
+        if (url) {
+          localStorage.setItem('custom_app_logo', url);
+          document.getElementById('appLogoImg').src = url;
+        }
+      }).getAppSettings();
+    }
+
+    function startClock() {
+      if(clockInterval) clearInterval(clockInterval);
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      
+      clockInterval = setInterval(() => {
+        const now = new Date();
+        document.getElementById('clockTime').innerText = now.toLocaleTimeString('id-ID', { hour12: false });
+        document.getElementById('clockDate').innerText = `${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`;
+      }, 1000);
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      const u = document.getElementById('loginUsername').value;
+      const p = document.getElementById('loginPassword').value;
+      const btn = document.getElementById('btnLogin');
+      btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Memproses...';
+
+      google.script.run.withSuccessHandler(res => {
+        btn.disabled = false; btn.innerHTML = 'Masuk Sekarang <i class="fa-solid fa-arrow-right ml-2"></i>';
+        if (res && res.success) { 
+          currentUser = res.user; 
+          localStorage.setItem('absensi_session', JSON.stringify(currentUser));
+          onLoginSuccess(); 
+        } else showAlert(res ? res.message : 'Login gagal.', 'danger');
+      }).loginUser(u, p);
+    }
+
+    function onLoginSuccess() {
+      document.getElementById('alertBox').classList.add('hidden'); 
+      document.getElementById('loginSection').classList.add('hidden');
+      document.getElementById('mainDashboardSection').classList.remove('hidden');
+      
+      document.getElementById('userNameBadge').innerText = currentUser.nama;
+      document.getElementById('userRoleBadge').innerText = currentUser.role;
+      document.getElementById('userProfileInitials').innerText = String(currentUser.nama).charAt(0).toUpperCase();
+
+      const userRoleLower = String(currentUser.role || '').trim().toLowerCase();
+      const isMgt = (userRoleLower === 'admin' || userRoleLower === 'owner');
+      
+      ['Cabang', 'User'].forEach(tab => {
+        const btmNav = document.getElementById('btmNav' + tab);
+        if (btmNav) btmNav.classList.toggle('hidden', !isMgt);
+      });
+
+      startClock();
+      switchMainTab('absen');
+      initPortalGPS();
+      loadGlobalAppLogo();
+    }
+
+    function logout() { 
+      localStorage.removeItem('absensi_session');
+      currentUser = null;
+      todayAbsenStatus = { masuk: null, pulang: null }; 
+      if(clockInterval) clearInterval(clockInterval);
+      
+      document.getElementById('mainDashboardSection').classList.add('hidden');
+      document.getElementById('alertBox').classList.add('hidden');
+      document.getElementById('loginSection').classList.remove('hidden');
+      document.getElementById('loginUsername').value = '';
+      document.getElementById('loginPassword').value = '';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function switchMainTab(tab) {
+      const userRoleLower = currentUser ? String(currentUser.role || '').trim().toLowerCase() : '';
+      const isMgt = (userRoleLower === 'admin' || userRoleLower === 'owner');
+      if (!isMgt && (tab === 'cabang' || tab === 'user')) return showAlert('Akses ditolak!', 'warning');
+
+      const tabs = ['absen', 'jadwal', 'logabsen', 'cabang', 'user'];
+      
+      tabs.forEach(t => {
+          const btmBtn = document.getElementById('btmNav' + t.charAt(0).toUpperCase() + t.slice(1));
+          if(btmBtn) {
+              btmBtn.className = (t === tab) ? "touch-btn flex flex-col items-center p-2 text-brand-800 transition transform scale-110" : "touch-btn flex flex-col items-center p-2 text-slate-400 hover:text-brand-600 transition";
+          }
+      });
+
+      tabs.forEach(t => {
+        const div = document.getElementById('contentTab' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (div) div.classList.toggle('hidden', t !== tab);
+      });
+
+      if (tab === 'absen') {
+        setTimeout(() => {
+          if (map) {
+            map.invalidateSize();
+            if (selectedCabang) {
+              map.setView([selectedCabang.lat, selectedCabang.lng], 16);
+            }
+          }
+        }, 300);
+      }
+      if (tab === 'jadwal') loadJadwalKerjaTab();
+      if (tab === 'logabsen') loadAdminLogs();
+      if (tab === 'cabang') loadAdminCabangList();
+      if (tab === 'user') loadAdminKaryawanList();
+    }
+
+    function fetchTodayStatus() {
+      google.script.run.withSuccessHandler(data => { 
+        if(data) todayAbsenStatus = data;
+        updateMainButtonUI(); 
+      }).getTodayStatus(currentUser.id);
+    }
+
+    function updateMainButtonUI() {
+      const btn = document.getElementById('btnMainAbsen');
+      const statusLabel = document.getElementById('statusSelesaiLabel');
+      statusLabel.classList.add('hidden');
+      
+      if (!todayAbsenStatus.masuk) {
+          currentMainAction = 'MASUK';
+          btn.disabled = false;
+          btn.className = "touch-btn w-full bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold py-4 rounded-2xl shadow-lg shadow-emerald-500/30 transition-all text-sm flex items-center justify-center space-x-2";
+          btn.innerHTML = `<i class="fa-solid fa-fingerprint text-xl"></i><span class="tracking-wide text-base">CHECK-IN</span>`;
+      } 
+      else if (todayAbsenStatus.masuk && !todayAbsenStatus.pulang) {
+          currentMainAction = 'PULANG';
+          btn.disabled = false;
+          btn.className = "touch-btn w-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold py-4 rounded-2xl shadow-lg shadow-amber-500/30 transition-all text-sm flex items-center justify-center space-x-2";
+          btn.innerHTML = `<i class="fa-solid fa-right-from-bracket text-xl"></i><span class="tracking-wide text-base">CHECK-OUT</span>`;
+      }
+      else {
+          currentMainAction = 'SELESAI';
+          btn.disabled = true;
+          btn.className = "touch-btn w-full bg-slate-200 text-slate-400 font-extrabold py-4 rounded-2xl text-sm flex items-center justify-center space-x-2 cursor-not-allowed";
+          btn.innerHTML = `<i class="fa-solid fa-lock text-xl"></i><span class="tracking-wide text-base">SUDAH ABSEN</span>`;
+          statusLabel.innerHTML = `<i class="fa-solid fa-check-double text-brand-500"></i> <span class="text-brand-800">Selesai (${todayAbsenStatus.masuk} - ${todayAbsenStatus.pulang})</span>`;
+          statusLabel.classList.remove('hidden');
+      }
+    }
+
+    function handleMainAbsenAction() {
+        if(currentMainAction === 'MASUK') {
+            prosesSubmitAbsensi('MASUK');
+        } else if (currentMainAction === 'PULANG') {
+            document.getElementById('modalSalesCashError').classList.add('hidden');
+            document.getElementById('inputSalesCash').value = '';
+            document.getElementById('modalSalesCash').classList.remove('hidden');
+        }
+    }
+
+    function konfirmasiAbsenPulangWithSales() {
+      const val = document.getElementById('inputSalesCash').value;
+      if (val === '' || isNaN(val) || val < 0) return document.getElementById('modalSalesCashError').classList.remove('hidden');
+      document.getElementById('modalSalesCash').classList.add('hidden'); 
+      prosesSubmitAbsensi('PULANG', Number(val));
+    }
+
+    function initPortalGPS() { initLeafletMap(); loadCabangList(); refreshGPSLocation(); fetchTodayStatus(); }
+
+    function loadCabangList() {
+      google.script.run.withSuccessHandler(data => { listCabang = data||MOCK_CABANG; popCabang(document.getElementById('selectCabangToko')); }).getCabangList();
+    }
+
+    function popCabang(sel) {
+      sel.innerHTML = ''; listCabang.forEach(c => sel.innerHTML += `<option value="${c.id}">${c.nama}</option>`);
+      if(listCabang.length > 0) { 
+        const defaultCabangId = currentUser ? (currentUser.cabangId || listCabang[0].id) : listCabang[0].id;
+        const exists = listCabang.find(x => x.id === defaultCabangId);
+        sel.value = exists ? exists.id : listCabang[0].id; 
+        onCabangChanged(); 
+      }
+    }
+
+    function onCabangChanged() {
+      selectedCabang = listCabang.find(c => c.id === document.getElementById('selectCabangToko').value);
+      if(selectedCabang) { updateBranchMapCircle(); recalculateDistance(); }
+    }
+
+    function initLeafletMap() {
+      if (map) return; 
+      map = L.map('map', { zoomControl: false }).setView([-6.2088, 106.8456], 15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap'
+      }).addTo(map);
+      
+      setTimeout(() => { map.invalidateSize(); }, 200);
+    }
+    
+    function updateBranchMapCircle() {
+      if(!map || !selectedCabang) return; 
+      if(branchCircle) map.removeLayer(branchCircle);
+      branchCircle = L.circle([selectedCabang.lat, selectedCabang.lng], { color: '#2374b6', fillColor: '#2374b6', fillOpacity: 0.2, radius: selectedCabang.radius }).addTo(map);
+      map.setView([selectedCabang.lat, selectedCabang.lng], 16);
+      setTimeout(() => { map.invalidateSize(); }, 100);
+    }
+
+    function refreshGPSLocation() {
+      if (!navigator.geolocation) return showAlert('GPS tidak didukung perangkat ini.', 'danger');
+      document.getElementById('txtDistanceInfo').innerText = 'Menghitung Jarak...';
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          currentLat = pos.coords.latitude; currentLng = pos.coords.longitude; currentAccuracy = pos.coords.accuracy;
+          isFakeGpsDetected = (pos.coords.accuracy === 0);
+
+          if (map) { 
+              if (userMarker) map.removeLayer(userMarker); 
+              const userIcon = L.divIcon({ className: 'custom-div-icon', html: "<div style='background-color:#10b981;width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.5);'></div>", iconSize: [14, 14], iconAnchor: [7, 7] });
+              userMarker = L.marker([currentLat, currentLng], {icon: userIcon}).addTo(map); 
+          }
+          recalculateDistance();
+        },
+        err => { document.getElementById('txtDistanceInfo').innerText = 'Gagal Akses GPS'; showAlert('Mohon aktifkan GPS Anda!', 'danger'); },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+
+    function recalculateDistance() {
+      if (currentLat === null || !selectedCabang) return;
+      var R = 6371000, dLat = (selectedCabang.lat - currentLat) * Math.PI / 180, dLon = (selectedCabang.lng - currentLng) * Math.PI / 180;
+      var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(currentLat * Math.PI / 180) * Math.cos(selectedCabang.lat * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+      currentDistance = Math.round(R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))));
+      
+      const txtInfo = document.getElementById('txtDistanceInfo');
+      const warnBadge = document.getElementById('warningBadgeGPS');
+      const warnTxt = document.getElementById('warningTextGPS');
+
+      txtInfo.innerHTML = `<span>${selectedCabang.alamat || selectedCabang.nama}</span> <span class="text-brand-500 font-extrabold ml-1">(${currentDistance}m)</span>`;
+      
+      warnBadge.classList.add('hidden');
+      if (isFakeGpsDetected) {
+          warnTxt.innerText = "Indikasi Fake GPS. Absen mungkin ditolak/ALFA.";
+          warnBadge.classList.remove('hidden');
+      } else if (currentDistance > 500) { 
+          warnTxt.innerText = `Jarak >500m dari lokasi. Absen tidak diizinkan.`;
+          warnBadge.classList.remove('hidden'); 
+      }
+    }
+
+    function prosesSubmitAbsensi(tipe, salesCash = 0) {
+      if (!selectedCabang || currentLat === null) return showAlert('Harap tunggu GPS selesai memuat!', 'warning');
+      if (currentDistance > 500) return showAlert('Batas 500m terlampaui. Anda terlalu jauh dari toko.', 'danger');
+
+      const payload = { userId: currentUser.id, userName: currentUser.nama, cabangId: selectedCabang.id, tipe: tipe, lat: currentLat, lng: currentLng, accuracy: currentAccuracy, isFakeDetected: isFakeGpsDetected, pendapatanSalesCash: salesCash };
+      const btn = document.getElementById('btnMainAbsen');
+      btn.disabled = true;
+
+      google.script.run.withSuccessHandler(res => {
+        showAlert(res.message, res.status === 'HADIR' ? 'success' : (res.status === 'REJECTED' ? 'warning' : 'danger'));
+        if (res.status === 'HADIR' || res.status.includes('ALFA')) {
+          todayAbsenStatus[tipe.toLowerCase()] = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
+        }
+        updateMainButtonUI();
+      }).submitAbsensi(payload);
+    }
+
+    function loadJadwalKerjaTab() {
+      const userRoleLower = currentUser ? String(currentUser.role || '').trim().toLowerCase() : '';
+      const isMgt = (userRoleLower === 'admin' || userRoleLower === 'owner');
+      document.getElementById('btnSaveSchedule').classList.toggle('hidden', !isMgt);
+
+      const reqPayload = { role: currentUser.role, cabangId: currentUser.cabangId };
+      google.script.run.withSuccessHandler(karyawans => {
+        listKaryawan = karyawans || MOCK_USERS;
+        google.script.run.withSuccessHandler(schedules => { jadwalDataStore = schedules || []; renderJadwalGrid(); }).getJadwalKerja();
+      }).getKaryawanAll(reqPayload);
+    }
+
+    function changeScheduleWeek(days) {
+      scheduleOffsetDays += days;
+      renderJadwalGrid();
+    }
+
+    function renderJadwalGrid() {
+      const userRoleLower = currentUser ? String(currentUser.role || '').trim().toLowerCase() : '';
+      const isMgt = (userRoleLower === 'admin' || userRoleLower === 'owner');
+      let targetKaryawans = isMgt ? listKaryawan : listKaryawan.filter(k => String(k.id) === String(currentUser.id));
+      let dateStrs = [], daysHeaderHtml = '';
+
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(); d.setDate(d.getDate() + scheduleOffsetDays + i);
+        dateStrs.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+        daysHeaderHtml += `<th class="px-1 py-2 text-center font-bold"><span class="text-[9px] opacity-80 uppercase">${['Min','Sen','Sel','Rab','Kam','Jum','Sab'][d.getDay()]}</span><br><span class="text-xs">${d.getDate()}</span></th>`;
+      }
+
+      let html = `<thead><tr class="bg-slate-100 text-slate-500 text-[10px] border-b border-slate-200"><th class="px-3 py-2 font-extrabold text-left sticky left-0 bg-slate-100 z-10 min-w-[70px]">Karyawan</th>${daysHeaderHtml}</tr></thead><tbody>`;
+      if (targetKaryawans.length === 0) html += `<tr><td colspan="8" class="p-4 text-center text-[11px] text-slate-400">Data tidak ditemukan.</td></tr>`;
+
+      targetKaryawans.forEach(emp => {
+        let firstName = emp.nama.split(' ')[0].substring(0,8); 
+        html += `<tr class="border-b border-slate-100 hover:bg-slate-50 transition"><td class="px-3 py-2 font-bold text-slate-700 text-[11px] sticky left-0 bg-white z-10 border-r border-slate-100 leading-tight">${firstName}<br><span class="text-[8px] text-brand-500 font-mono">${emp.id}</span></td>`;
+        
+        const canEdit = isMgt && !(userRoleLower === 'admin' && String(emp.role).toLowerCase() === 'owner');
+        
+        dateStrs.forEach(dateStr => {
+          const shiftVal = (jadwalDataStore.find(s => String(s.idKaryawan) === String(emp.id) && s.tanggal === dateStr) || {}).shift || 'M'; 
+          let bg = shiftVal==='L'?'bg-rose-50 text-rose-600 border-rose-200':(shiftVal==='C'?'bg-amber-50 text-amber-600 border-amber-200':(shiftVal==='S'?'bg-indigo-50 text-indigo-600 border-indigo-200':'bg-emerald-50 text-emerald-600 border-emerald-200'));
+          if (canEdit) html += `<td class="p-1 text-center"><button onclick="toggleShiftCell('${emp.id}', '${dateStr}')" class="touch-btn w-[26px] h-[26px] mx-auto rounded-lg font-extrabold text-[10px] border shadow-sm ${bg}">${shiftVal}</button></td>`;
+          else html += `<td class="p-1 text-center"><div class="w-[26px] h-[26px] mx-auto rounded-lg font-extrabold text-[10px] border flex items-center justify-center opacity-70 ${bg}">${shiftVal}</div></td>`;
+        });
+        html += `</tr>`;
+      });
+      document.getElementById('tableJadwalGrid').innerHTML = html + '</tbody>';
+    }
+
+    function toggleShiftCell(id, date) {
+      const shifts = ['M', 'L', 'C', 'S'];
+      let f = jadwalDataStore.find(s => String(s.idKaryawan) === String(id) && s.tanggal === date);
+      if (f) f.shift = shifts[(shifts.indexOf(f.shift) + 1) % shifts.length]; else jadwalDataStore.push({ idKaryawan: id, tanggal: date, shift: 'L' });
+      renderJadwalGrid();
+    }
+    
+    function saveJadwalChanges() {
+      const btn = document.getElementById('btnSaveSchedule');
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+      google.script.run.withSuccessHandler(r => {
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1"></i>Simpan';
+        showAlert(r.message, 'success');
+      }).saveJadwalKerja(jadwalDataStore);
+    }
+
+    function loadAdminLogs() {
+      const tb = document.getElementById('tblAdminLogsBody'); 
+      const badgeHadir = document.getElementById('badgeTotalHadirKaryawan');
+      if (badgeHadir) badgeHadir.classList.add('hidden'); 
+      tb.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat log...</td></tr>';
+      
+      const payload = currentUser ? { userId: String(currentUser.id), role: String(currentUser.role), cabangId: String(currentUser.cabangId) } : null;
+
+      google.script.run
+        .withSuccessHandler(logs => {
+          allLogsData = logs || [];
+          const userRoleLower = currentUser ? String(currentUser.role || '').trim().toLowerCase() : '';
+          
+          const filterEl = document.getElementById('filterLogKaryawan');
+          if (userRoleLower === 'owner') {
+              filterEl.classList.remove('hidden');
+              
+              const uniqueUsers = [...new Map(allLogsData.map(item => [item.userId, item])).values()];
+              let filterOptions = '<option value="ALL">Semua Karyawan</option>';
+              uniqueUsers.forEach(u => {
+                  filterOptions += `<option value="${u.userId}">${u.namaKaryawan}</option>`;
+              });
+              
+              const currentFilterVal = filterEl.value;
+              filterEl.innerHTML = filterOptions;
+              
+              if([...filterEl.options].some(o => o.value === currentFilterVal)) {
+                  filterEl.value = currentFilterVal;
+              }
+          } else {
+              filterEl.classList.add('hidden');
+          }
+          
+          applyLogFilter();
+        })
+        .getAbsensiHistory(payload);
+    }
+
+    function applyLogFilter() {
+        const tb = document.getElementById('tblAdminLogsBody');
+        const badgeHadir = document.getElementById('badgeTotalHadirKaryawan');
+        const filterEl = document.getElementById('filterLogKaryawan');
+        const filterVal = filterEl ? filterEl.value : 'ALL';
+        const userRoleLower = currentUser ? String(currentUser.role || '').trim().toLowerCase() : '';
+
+        let filteredLogs = allLogsData;
+
+        if (userRoleLower === 'owner' && filterVal !== 'ALL' && filterVal !== '') {
+            filteredLogs = allLogsData.filter(l => String(l.userId) === filterVal);
+        }
+
+        if (!filteredLogs || filteredLogs.length === 0) {
+            tb.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-400 text-xs">Belum ada data absen.</td></tr>';
+            if (badgeHadir) badgeHadir.classList.add('hidden');
+            return;
+        }
+
+        const totalHadir = filteredLogs.filter(l => String(l.tipe).toUpperCase().includes('MASUK') && !String(l.status).toUpperCase().includes('ALFA') && !String(l.status).toUpperCase().includes('REJECTED')).length;
+        
+        if (badgeHadir) {
+            badgeHadir.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i>Total Masuk: ${totalHadir}`;
+            badgeHadir.classList.remove('hidden');
+        }
+
+        tb.innerHTML = '';
+        filteredLogs.forEach(l => {
+          const statusColor = (String(l.status).includes('ALFA') || String(l.status).includes('REJECTED')) ? 'text-rose-500 bg-rose-50 border-rose-100' : 'text-emerald-600 bg-emerald-50 border-emerald-100';
+          const typeColor = String(l.tipe).includes('MASUK') ? 'text-emerald-600' : 'text-amber-600';
+          tb.innerHTML += `<tr class="border-b border-slate-100 hover:bg-slate-50"><td class="p-2 align-top"><span class="text-[9px] text-slate-400 block font-semibold">${l.tanggal}</span><span class="font-extrabold text-slate-700">${l.jam}</span></td><td class="p-2 font-bold text-[11px] text-slate-700 leading-tight">${l.namaKaryawan}</td><td class="p-2 font-bold text-[10px] ${typeColor}">${l.tipe}</td><td class="p-2 text-slate-500 font-mono text-[10px]">Rp${l.pendapatanSalesCash||0}</td><td class="p-2 text-center"><span class="inline-block px-1.5 py-0.5 rounded border text-[9px] font-extrabold ${statusColor}">${l.status}</span></td></tr>`;
+        });
+    }
+
+    function loadAdminCabangList() {
+      const c = document.getElementById('listCabangAdmin'); c.innerHTML = '<div class="text-center text-xs py-4 text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat...</div>';
+      google.script.run.withSuccessHandler(data => { listCabang = data; c.innerHTML = ''; data.forEach(i => c.innerHTML += `<div class="p-3 bg-white border border-slate-200 rounded-xl mb-2 flex justify-between items-center shadow-sm"><div><b class="text-slate-700 text-sm">${i.nama}</b><p class="text-[10px] text-slate-500"><i class="fa-solid fa-location-dot mr-1"></i>${i.alamat} &bull; Radius: ${i.radius}m</p></div><button onclick="editCabangForm('${i.id}')" class="text-[10px] bg-brand-50 text-brand-600 font-bold border border-brand-200 px-3 py-1.5 rounded-lg shadow-sm">Edit</button></div>`); }).getCabangList();
+    }
+    
+    function editCabangForm(id) { const c = listCabang.find(x => x.id === id); if(c) { ['Id','Nama','Alamat','Lat','Lng','Radius'].forEach(k => document.getElementById('cabang'+k).value = c[k.toLowerCase()]); } }
+    function handleSaveCabang(e) { e.preventDefault(); const p = { id: document.getElementById('cabangId').value, nama: document.getElementById('cabangNama').value, alamat: document.getElementById('cabangAlamat').value, lat: document.getElementById('cabangLat').value, lng: document.getElementById('cabangLng').value, radius: document.getElementById('cabangRadius').value }; google.script.run.withSuccessHandler(r => { showAlert(r.message, 'success'); document.getElementById('formCabang').reset(); loadAdminCabangList(); }).saveCabang(p); }
+
+    function loadAdminKaryawanList() {
+      const c = document.getElementById('listKaryawanAdmin'); c.innerHTML = '<div class="text-center text-xs py-4 text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat...</div>';
+      const userRoleLower = currentUser ? String(currentUser.role || '').trim().toLowerCase() : '';
+      const optRoleOwner = document.getElementById('optRoleOwner');
+      if (optRoleOwner) optRoleOwner.style.display = (userRoleLower === 'owner') ? 'block' : 'none';
+      
+      const reqPayload = { role: currentUser.role, cabangId: currentUser.cabangId };
+      google.script.run.withSuccessHandler(users => { 
+        listKaryawan = users||[]; c.innerHTML = ''; 
+        listKaryawan.forEach(u => c.innerHTML += `<div class="p-3 bg-white border border-slate-200 rounded-xl mb-2 flex justify-between items-center shadow-sm"><div><b class="text-slate-700 text-sm">${u.nama}</b> <span class="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ml-1">${u.role}</span><p class="text-[10px] text-slate-500 font-mono mt-0.5">${u.username}</p></div>${(userRoleLower==='admin'&&String(u.role).toLowerCase()==='owner')?'<span class="text-[10px] p-2 text-slate-300"><i class="fa-solid fa-lock"></i></span>':`<button onclick="editKaryawanForm('${u.id}')" class="text-[10px] bg-brand-50 text-brand-600 font-bold border border-brand-200 px-3 py-1.5 rounded-lg shadow-sm">Edit</button>`}</div>`); 
+      }).getKaryawanAll(reqPayload);
+    }
+    
+    function editKaryawanForm(id) { const u = listKaryawan.find(x => x.id === id); if(u) { document.getElementById('empId').value = u.id; document.getElementById('empUsername').value = u.username; document.getElementById('empPassword').value = u.password; document.getElementById('empNama').value = u.nama; document.getElementById('empJabatan').value = u.jabatan; document.getElementById('empRole').value = u.role; } }
+    function handleSaveKaryawan(e) { e.preventDefault(); const p = { id: document.getElementById('empId').value, username: document.getElementById('empUsername').value, password: document.getElementById('empPassword').value, nama: document.getElementById('empNama').value, jabatan: document.getElementById('empJabatan').value, role: document.getElementById('empRole').value }; google.script.run.withSuccessHandler(r => { if(r.success){showAlert(r.message, 'success'); document.getElementById('formKaryawan').reset(); loadAdminKaryawanList();} else showAlert(r.message,'danger'); }).saveKaryawan(p, currentUser.role); }
+
+    function showAlert(msg, type) {
+      const box = document.getElementById('alertBox'), icon = document.getElementById('alertIcon');
+      box.className = `fixed top-4 left-4 right-4 z-[999] p-4 rounded-2xl border flex items-start space-x-3 text-sm shadow-xl transition-all ${type==='success'?'bg-emerald-50 border-emerald-200 text-emerald-700':(type==='danger'?'bg-rose-50 border-rose-200 text-rose-700':'bg-amber-50 border-amber-200 text-amber-700')}`;
+      icon.className = `fa-solid mt-0.5 text-lg ${type==='success'?'fa-circle-check text-emerald-500':(type==='danger'?'fa-circle-xmark text-rose-500':'fa-circle-exclamation text-amber-500')}`;
+      document.getElementById('alertText').innerHTML = msg; 
+      box.classList.remove('hidden', '-translate-y-20', 'opacity-0');
+      box.classList.add('translate-y-0', 'opacity-100');
+      setTimeout(() => {
+          box.classList.remove('translate-y-0', 'opacity-100');
+          box.classList.add('-translate-y-20', 'opacity-0');
+          setTimeout(() => box.classList.add('hidden'), 300);
+      }, 3500);
+    }
+
+    function openGantiLogoModal() {
+      const userRoleLower = currentUser ? String(currentUser.role || '').trim().toLowerCase() : '';
+      if(currentUser && (userRoleLower === 'admin' || userRoleLower === 'owner')) {
+        document.getElementById('inputLogoFile').value = '';
+        document.getElementById('inputLogoUrl').value = '';
+        document.getElementById('previewLogoImg').classList.add('hidden');
+        document.getElementById('previewLogoIcon').classList.remove('hidden');
+        tempLogoValue = "";
+        document.getElementById('modalGantiLogo').classList.remove('hidden');
+      }
+    }
+
+    function parseGoogleDriveLink(url) {
+      if (!url) return "";
+      let cleanUrl = url.trim();
+      let match = cleanUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || cleanUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      if (match && match[1]) {
+        return "https://lh3.googleusercontent.com/d/" + match[1];
+      }
+      return cleanUrl;
+    }
+
+    function handleLogoUrlInput(url) {
+      let directUrl = parseGoogleDriveLink(url);
+      if (directUrl && directUrl.startsWith('http')) {
+        tempLogoValue = directUrl;
+        document.getElementById('previewLogoImg').src = directUrl;
+        document.getElementById('previewLogoImg').classList.remove('hidden');
+        document.getElementById('previewLogoIcon').classList.add('hidden');
+      }
+    }
+
+    function handleLogoFileSelect(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          let w = img.width, h = img.height;
+          if (w > 200) { h = Math.round(h * (200 / w)); w = 200; }
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          tempLogoValue = canvas.toDataURL('image/png', 0.9);
+          document.getElementById('previewLogoImg').src = tempLogoValue;
+          document.getElementById('previewLogoImg').classList.remove('hidden');
+          document.getElementById('previewLogoIcon').classList.add('hidden');
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function simpanLogoBaru() {
+      if (!tempLogoValue) return showAlert('Pilih gambar atau masukkan link Google Drive terlebih dahulu!', 'warning');
+      
+      localStorage.setItem('custom_app_logo', tempLogoValue);
+      document.getElementById('appLogoImg').src = tempLogoValue;
+      document.getElementById('modalGantiLogo').classList.add('hidden');
+      showAlert('Logo berhasil diperbarui!', 'success');
+
+      google.script.run.withSuccessHandler(res => {
+        if (res && res.success) {
+          showAlert('Logo berhasil disinkronisasi ke server!', 'success');
+        }
+      }).saveAppSettings(tempLogoValue);
+    }
+  </script>
 </body>
 </html>
