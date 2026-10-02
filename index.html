@@ -396,12 +396,16 @@
       if (localLogo) {
         document.getElementById('appLogoImg').src = localLogo;
       }
-      google.script.run.withSuccessHandler(url => {
-        if (url && typeof url === 'string') {
-          localStorage.setItem('custom_app_logo', url);
-          document.getElementById('appLogoImg').src = url;
-        }
-      }).getAppSettings();
+      // Ambil logo dari server GAS melalui API bridge (berfungsi di GitHub Pages maupun GAS)
+      google.script.run
+        .withSuccessHandler(url => {
+          if (url && typeof url === 'string') {
+            localStorage.setItem('custom_app_logo', url);
+            document.getElementById('appLogoImg').src = url;
+          }
+        })
+        .withFailureHandler(err => console.error('Gagal mengambil logo dari server:', err))
+        .getAppSettings();
     }
 
     function startClock() {
@@ -914,11 +918,21 @@
       document.getElementById('modalGantiLogo').classList.add('hidden');
       showAlert('Logo berhasil diperbarui!', 'success');
 
-      google.script.run.withSuccessHandler(res => {
-        if (res && res.success) {
-          showAlert('Logo berhasil disinkronisasi ke server!', 'success');
-        }
-      }).saveAppSettings(tempLogoValue);
+      // Simpan logo melalui API bridge agar benar-benar diteruskan ke backend GAS.
+      google.script.run
+        .withSuccessHandler(res => {
+          if (res && res.success) {
+            showAlert('Logo berhasil disimpan ke server!', 'success');
+          } else {
+            showAlert((res && res.message) ? res.message : 'Logo gagal disimpan ke server.', 'danger');
+            console.error('saveAppSettings:', res);
+          }
+        })
+        .withFailureHandler(err => {
+          showAlert('Logo gagal disimpan ke server. Periksa koneksi GAS.', 'danger');
+          console.error('saveAppSettings error:', err);
+        })
+        .saveAppSettings(tempLogoValue);
     }
   </script>
 </body>
