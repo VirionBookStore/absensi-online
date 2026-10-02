@@ -312,7 +312,8 @@
 
   <script>
     // --- WRAPPER AGAR BERFUNGSI DI GAS MAUPUN DI GITHUB PAGES ---
-    const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz6gnrPXSLcYAWo_jGt_-F_vTsouoNkmoROGRFqvHMED7w7xWOno1zNFT2frBWtokOW/exec"; // <-- GANTI DENGAN URL WEB APP GAS ANDA
+    // PASTIKAN URL DI BAWAH INI DIGANTI DENGAN URL WEB APP GAS ANDA YANG AKTIF!
+    const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz6gnrPXSLcYAWo_jGt_-F_vTsouoNkmoROGRFqvHMED7w7xWOno1zNFT2frBWtokOW/exec"; 
 
     const google = {
       script: {
@@ -325,32 +326,36 @@
             this.failureCallback = failureCallback;
             return this;
           },
-          // Jembatan otomatis panggil backend GAS jika di GitHub Pages, atau pakai native jika di GAS
           callBackend: function(action, payload) {
+            // Jika berjalan langsung di dalam GAS, biarkan native yang bekerja
             if (typeof window.google !== 'undefined' && window.google.script && window.google.script.run && window.google.script.run !== google.script.run) {
-              // Berjalan di dalam lingkungan asli Google Apps Script
               return; 
             }
             
-            // Berjalan di GitHub Pages (menggunakan fetch ke Web App GAS)
+            // Jika berjalan di GitHub, gunakan fetch untuk menembak API GAS
             fetch(GAS_WEB_APP_URL, {
               method: "POST",
-              mode: "no-cors", // Diperlukan untuk bypass CORS sederhana pada GAS Web App
-              headers: { "Content-Type": "text/plain;charset=utf-8" },
+              headers: { 
+                // Wajib menggunakan text/plain agar tidak memicu error CORS preflight
+                "Content-Type": "text/plain;charset=utf-8" 
+              },
               body: JSON.stringify({ action: action, payload: payload })
             })
-            .then(() => {
-              // Karena mode 'no-cors' tidak bisa membaca response JSON langsung secara aman, 
-              // kita handle callback sukses secara umum atau gunakan metode get terpisah jika perlu.
-              if (this.successCallback) this.successCallback({ success: true });
+            .then(response => {
+              if (!response.ok) throw new Error("Gagal terhubung ke server GAS");
+              return response.json(); // Baca data JSON dari server
+            })
+            .then(data => {
+              if (this.successCallback) this.successCallback(data);
             })
             .catch(err => {
+              console.error("Error Fetch Backend:", err);
               if (this.failureCallback) this.failureCallback(err);
             });
           },
 
           loginUser: function(u, p) { this.callBackend('loginUser', {username: u, password: p}); },
-          getTodayStatus: function(userId) { this.callBackend('getTodayStatus', userId); },
+          getTodayStatus: function(userId) { this.callBackend('getTodayStatus', {userId: userId}); },
           getCabangList: function() { this.callBackend('getCabangList', {}); },
           submitAbsensi: function(payload) { this.callBackend('submitAbsensi', payload); },
           getJadwalKerja: function() { this.callBackend('getJadwalKerja', {}); },
