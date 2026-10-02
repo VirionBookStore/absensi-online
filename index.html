@@ -187,7 +187,7 @@
         <div class="overflow-x-auto">
           <table class="w-full text-left text-xs text-slate-600 border-collapse">
             <thead><tr class="bg-slate-50 text-[10px] text-slate-500 border-b border-slate-200"><th class="p-2 font-bold">Waktu</th><th class="p-2 font-bold">Nama</th><th class="p-2 font-bold">Tipe</th><th class="p-2 font-bold">Sales</th><th class="p-2 font-bold">Status</th></tr></thead>
-            <tbody id="tblAdminLogsBody"><tr><td colspan="5" class="p-4 text-center text-slate-400">Klik Muat Log.</td></tr></tbody>
+            <tbody id="tblAdminLogsBody"><tr><td colspan="5" class="p-4 text-center text-slate-400"></td></tr></tbody>
           </table>
         </div>
       </div>
@@ -793,7 +793,7 @@
         const totalHadir = filteredLogs.filter(l => String(l.tipe).toUpperCase().includes('MASUK') && !String(l.status).toUpperCase().includes('ALFA') && !String(l.status).toUpperCase().includes('REJECTED')).length;
         
         if (badgeHadir) {
-            badgeHadir.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i>Total Masuk: ${totalHadir}`;
+            badgeHadir.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i>${totalHadir}`;
             badgeHadir.classList.remove('hidden');
         }
 
