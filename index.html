@@ -311,54 +311,64 @@
   </div>
 
   <script>
-    // --- WRAPPER API FETCH KE GAS ---
-    // Ganti URL di bawah ini dengan URL Web App Anda dari Google Apps Script
-    // Pastikan Web App dideploy dengan hak akses: "Execute as: Me" dan "Who has access: Anyone"
+    // --- WRAPPER API FETCH KE GAS (PERBAIKAN RACE CONDITION) ---
+    // Pastikan URL di bawah ini diisi dengan URL Web App GAS Anda
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbymmsMVHN_2B6Ma021ZTHvAfYogCxgPEAxTCwOwryo0h7tnLE1UaOmDPz9bq1KEaoJe/exec";
 
     const google = {
       script: {
-        run: {
-          withSuccessHandler: function(successCallback) {
-            this.successCallback = successCallback;
-            return this;
-          },
-          withFailureHandler: function(failureCallback) {
-            this.failureCallback = failureCallback;
-            return this;
-          },
-          callBackend: function(action, payload) {
-            fetch(GAS_WEB_APP_URL, {
-              method: "POST",
-              headers: { "Content-Type": "text/plain;charset=utf-8" },
-              body: JSON.stringify({ action: action, payload: payload })
-            })
-            .then(response => {
-              if (!response.ok) throw new Error("Network response was not ok");
-              return response.json();
-            })
-            .then(data => {
-              if (this.successCallback) this.successCallback(data);
-            })
-            .catch(error => {
-              console.error("Error connecting to GAS:", error);
-              if (this.failureCallback) this.failureCallback(error);
-            });
-          },
+        // Menggunakan getter agar setiap panggilan membuat instansi/jalur baru (isolasi request)
+        get run() {
+          return {
+            _successHandler: null,
+            _failureHandler: null,
+            
+            withSuccessHandler: function(successCallback) {
+              this._successHandler = successCallback;
+              return this;
+            },
+            withFailureHandler: function(failureCallback) {
+              this._failureHandler = failureCallback;
+              return this;
+            },
+            callBackend: function(action, payload) {
+              // Kunci fungsi callback ke dalam memori lokal request ini
+              const onSuccess = this._successHandler;
+              const onFailure = this._failureHandler;
+              
+              fetch(GAS_WEB_APP_URL, {
+                method: "POST",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify({ action: action, payload: payload })
+              })
+              .then(response => {
+                if (!response.ok) throw new Error("Gagal terhubung ke server");
+                return response.json();
+              })
+              .then(data => {
+                if (onSuccess) onSuccess(data);
+              })
+              .catch(error => {
+                console.error("Error API:", error);
+                if (onFailure) onFailure(error);
+              });
+            },
 
-          loginUser: function(u, p) { this.callBackend('loginUser', {username: u, password: p}); },
-          getTodayStatus: function(userId) { this.callBackend('getTodayStatus', {userId: userId}); },
-          getCabangList: function() { this.callBackend('getCabangList', {}); },
-          submitAbsensi: function(payload) { this.callBackend('submitAbsensi', payload); },
-          getJadwalKerja: function() { this.callBackend('getJadwalKerja', {}); },
-          saveJadwalKerja: function(jadwalData) { this.callBackend('saveJadwalKerja', {jadwalData: jadwalData}); },
-          getDashboardStats: function(req) { this.callBackend('getDashboardStats', {req: req}); },
-          getAbsensiHistory: function(req) { this.callBackend('getAbsensiHistory', {req: req}); },
-          saveCabang: function(cabangData) { this.callBackend('saveCabang', {cabangData: cabangData}); },
-          getKaryawanAll: function(req) { this.callBackend('getKaryawanAll', {req: req}); },
-          saveKaryawan: function(karyawanData, userRole) { this.callBackend('saveKaryawan', {karyawanData: karyawanData, userRole: userRole}); },
-          getAppSettings: function() { this.callBackend('getAppSettings', {}); },
-          saveAppSettings: function(logoUrl) { this.callBackend('saveAppSettings', {logoUrl: logoUrl}); }
+            // Daftar endpoint ke GAS
+            loginUser: function(u, p) { this.callBackend('loginUser', {username: u, password: p}); },
+            getTodayStatus: function(userId) { this.callBackend('getTodayStatus', {userId: userId}); },
+            getCabangList: function() { this.callBackend('getCabangList', {}); },
+            submitAbsensi: function(payload) { this.callBackend('submitAbsensi', payload); },
+            getJadwalKerja: function() { this.callBackend('getJadwalKerja', {}); },
+            saveJadwalKerja: function(jadwalData) { this.callBackend('saveJadwalKerja', {jadwalData: jadwalData}); },
+            getDashboardStats: function(req) { this.callBackend('getDashboardStats', {req: req}); },
+            getAbsensiHistory: function(req) { this.callBackend('getAbsensiHistory', {req: req}); },
+            saveCabang: function(cabangData) { this.callBackend('saveCabang', {cabangData: cabangData}); },
+            getKaryawanAll: function(req) { this.callBackend('getKaryawanAll', {req: req}); },
+            saveKaryawan: function(karyawanData, userRole) { this.callBackend('saveKaryawan', {karyawanData: karyawanData, userRole: userRole}); },
+            getAppSettings: function() { this.callBackend('getAppSettings', {}); },
+            saveAppSettings: function(logoUrl) { this.callBackend('saveAppSettings', {logoUrl: logoUrl}); }
+          };
         }
       }
     };
