@@ -31,11 +31,11 @@
   
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap');
-    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; color: #334155; height: 100vh; overflow: hidden; }
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; color: #334155; height: 100vh; height: 100dvh; min-height: 100dvh; overflow: hidden; }
     #map { height: 220px; width: 100%; border-radius: 1rem; z-index: 1; }
     .touch-btn { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
-    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }\n    .pb-safe { padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)); }\n    .bottom-nav-safe { bottom: env(safe-area-inset-bottom, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
     
     .clock-circle {
       width: 200px; height: 200px;
@@ -106,7 +106,7 @@
       </div>
     </header>
 
-    <div class="flex-1 overflow-y-auto p-4 space-y-4 pb-24">
+    <div class="flex-1 overflow-y-auto p-4 space-y-4 pb-[7.5rem] overscroll-contain">
       
       <!-- Tab Absen -->
       <div id="contentTabAbsen" class="space-y-5 pb-6">
@@ -247,7 +247,7 @@
     </div>
 
     <!-- BOTTOM NAVIGATION LOCKED -->
-    <nav class="bg-white border-t border-slate-200 pb-safe z-30 absolute bottom-0 w-full max-w-md mx-auto shadow-[0_-4px_15px_-5px_rgba(0,0,0,0.05)]">
+    <nav class="bg-white border-t border-slate-200 bottom-nav-safe z-30 fixed bottom-0 left-0 right-0 w-full max-w-md mx-auto shadow-[0_-4px_15px_-5px_rgba(0,0,0,0.05)]">
       <div id="bottomNavContainer" class="flex justify-around p-2">
         <button id="btmNavAbsen" onclick="switchMainTab('absen')" class="touch-btn flex flex-col items-center p-2 text-brand-800 transition"><i class="fa-solid fa-clock text-xl mb-1"></i><span class="text-[9px] font-bold">Absen</span></button>
         <button id="btmNavJadwal" onclick="switchMainTab('jadwal')" class="touch-btn flex flex-col items-center p-2 text-slate-400 hover:text-brand-600 transition"><i class="fa-solid fa-calendar-days text-xl mb-1"></i><span class="text-[9px] font-bold">Jadwal</span></button>
